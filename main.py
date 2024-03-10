@@ -1,23 +1,36 @@
+import uuid
+
 from flask import Flask, request, Response
 from gtts import gTTS
-import io
+
 app = Flask(__name__)
 
 
 @app.route("/tts", methods=["POST"])
 def tts():
     text = request.json["text"]
-    # gTTS kullanarak metni ses dosyasına dönüştürün
+
     tts = gTTS(text, lang="tr")
 
-    # Ses dosyasını byte array'e dönüştürün
-    wav_data = io.BytesIO()
-    tts.write_to_fp(wav_data)
-    wav_data.seek(0)
+    filename = f"{uuid.uuid4()}.mp3"  # Benzersiz bir dosya adı oluşturuyoruz
+    with open(f"static/{filename}", "wb") as f:
+        tts.write_to_fp(f)
 
-    # Byte array'i response body'de gönderin
-    response = Response(wav_data.getvalue(), mimetype="audio/wav")
-    response.headers["Content-Length"] = len(wav_data.getvalue())
+    return {"filename": filename}  # Oluşturulan dosya adını döndürüyoruz
+
+
+@app.route("/get_tts", methods=["GET"])
+def get_tts():
+    filename = request.args["filename"]  # Dosya adını parametre olarak aldık
+
+    try:
+        with open(f"static/{filename}", "rb") as f:
+            wav_data = f.read()
+    except FileNotFoundError:
+        return {"error": "Dosya bulunamadı."}, 404
+
+    response = Response(wav_data, mimetype="audio/mp3")
+    response.headers["Content-Length"] = len(wav_data)
     return response
 
 
